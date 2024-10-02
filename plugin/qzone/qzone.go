@@ -31,12 +31,12 @@ const (
 	agreeStatus
 	disagreeStatus
 	loveTag      = "表白"
-	faceURL      = "http://q4.qlogo.cn/g?b=qq&nk=%v&s=640"
+	faceURL      = "https://q4.qlogo.cn/g?b=qq&nk=%v&s=640"
 	anonymousURL = "https://gitcode.net/anto_july/avatar/-/raw/master/%v.png"
 )
 
 func init() {
-	engine := control.Register("qzone", &ctrl.Options[*zero.Ctx]{
+	engine := control.AutoRegister(&ctrl.Options[*zero.Ctx]{
 		DisableOnDefault: false,
 		Brief:            "QQ空间表白墙",
 		Help: "- 登录QQ空间 (Cookie过期很快, 要经常登录)\n" +
