@@ -297,9 +297,37 @@ func init() {
 			if thingName != "" {
 				newThing := article{}
 				if strings.Contains(thingName, "竿") {
-					info := strconv.Itoa(rand.Intn(durationList[thingName])+1) +
-						"/" + strconv.Itoa(rand.Intn(10)) + "/" +
-						strconv.Itoa(rand.Intn(3)) + "/" + strconv.Itoa(rand.Intn(2))
+					durability := strconv.Itoa(rand.Intn(durationList[thingName]) + 1)
+					maintenance := strconv.Itoa(rand.Intn(10)) // 维修次数保持原逻辑 (0-9)
+
+					// --- 修改后的诱钓等级逻辑 ---
+					var induceLevel int
+					diceInduce := rand.Intn(100) // 生成 0-99 的随机数
+					if diceInduce < 95 {         // 0-94 (95% 的概率)
+						induceLevel = 0
+					} else if diceInduce < 99 { // 95-98 (4% 的概率, 95+4=99)
+						induceLevel = 1
+					} else {                    // 99 (1% 的概率)
+						induceLevel = 2
+					}
+					induceLevelStr := strconv.Itoa(induceLevel)
+					// --- 诱钓等级逻辑结束 ---
+
+					// --- 修改后的海之眷顾等级逻辑 ---
+					var favorLevel int
+					diceFavor := rand.Intn(100) // 生成 0-99 的随机数
+					if diceFavor < 99 {        // 0-98 (99% 的概率)
+						favorLevel = 0
+					} else {                   // 99 (1% 的概率)
+						favorLevel = 1
+					}
+					favorLevelStr := strconv.Itoa(favorLevel)
+					// --- 海之眷顾等级逻辑结束 ---
+
+					info := durability +
+						"/" + maintenance +
+						"/" + induceLevelStr +
+						"/" + favorLevelStr
 					newThing = article{
 						Duration: time.Now().Unix()*100 + int64(i),
 						Type:     typeOfThing,
