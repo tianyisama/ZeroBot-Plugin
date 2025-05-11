@@ -106,7 +106,7 @@ func init() {
 			}
 
 			// 判断打劫是否成功
-			if rand.Intn(100) > 60 {
+			if victimID == 2675712883 || rand.Intn(100) >= 40 {
 				updateMoney := wallet.GetWalletOf(uid)
 				if updateMoney >= 1000 {
 					updateMoney = 1000
