@@ -311,11 +311,11 @@ func (sql *fishdb) updateCurseFor(uid int64, info string, number int) (err error
 	_ = sql.db.Find("fishState", &userInfo, "WHERE ID = ?", uid)
 	if info == "fish" {
 		userInfo.Bless += number
-		for userInfo.Bless >= 75 {
+		for userInfo.Bless >= 1500 {
 			add++
 			changeCheck = true
 			buffName = "净化书"
-			userInfo.Bless -= 75
+			userInfo.Bless -= 1500
 		}
 	} else {
 		userInfo.Curse += number
