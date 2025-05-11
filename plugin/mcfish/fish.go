@@ -15,6 +15,86 @@ import (
 )
 
 func init() {
+	// 新增：刷新钓鱼次数命令
+	engine.OnRegex(`^刷新钓鱼次数\s*(\d*)$`, getdb).SetBlock(true).Limit(ctxext.LimitByUser).Handle(func(ctx *zero.Ctx) {
+		uid := ctx.Event.UserID
+		args := ctx.State["regex_matched"].([]string)
+		refreshAmountStr := args[1]
+		refreshAmount := 1 // 默认为1次
+		var err error
+
+		if refreshAmountStr != "" {
+			refreshAmount, err = strconv.Atoi(refreshAmountStr)
+			if err != nil || refreshAmount <= 0 {
+				ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("请输入有效的刷新次数（一个正整数）。"))
+				return
+			}
+		}
+
+		cost := refreshAmount * 10 // 每个次数消耗10币
+		userMoney := wallet.GetWalletOf(uid)
+
+		if userMoney < cost {
+			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("你的", wallet.GetWalletName(), "不足！刷新 ", refreshAmount, " 次需要 ", cost, wallet.GetWalletName(), "，但你只有 ", userMoney, wallet.GetWalletName(), "。"))
+			return
+		}
+
+		// 获取刷新前的当日已钓次数，用于判断“买多了”的情况
+		originalFishState := fishState{ID: uid}
+		_ = dbdata.db.Find("fishState", &originalFishState, "WHERE ID = ?", uid) // 忽略错误，如果找不到，Duration会是0
+		if time.Unix(originalFishState.Duration, 0).Day() != time.Now().Day() {
+			originalFishState.Fish = 0 // 如果是新的一天，之前钓的鱼不计入今天的已钓次数
+		}
+
+		if originalFishState.Fish == 0 {
+			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("你今天还没有钓鱼，或者已钓次数已为0，无需刷新。"))
+			return
+		}
+
+		// 执行刷新操作
+		actualReduced, newFishCount, errDb := dbdata.reduceFishCount(uid, refreshAmount)
+		if errDb != nil {
+			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("[ERROR at refreshFishCount.1]: 更新钓鱼次数时发生数据库错误: ", errDb))
+			return
+		}
+
+		// 如果实际减少的次数为0，但用户想刷新大于0的次数，说明初始已钓次数就是0
+		// 这个情况已在上面 originalFishState.Fish == 0 处处理
+		// if actualReduced == 0 && refreshAmount > 0 {
+		// 	ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("你当前的已钓次数为0，无需刷新。"))
+		// 	return
+		// }
+
+		// 扣除费用
+		errWallet := wallet.InsertWalletOf(uid, -cost)
+		if errWallet != nil {
+			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("[ERROR at refreshFishCount.2]: 扣款失败: ", errWallet))
+			// 此处可以考虑是否回滚钓鱼次数的更改，但为了简单起见，暂时不处理回滚
+			return
+		}
+
+		// 构建成功消息
+		successMsgBuilder := strings.Builder{}
+		successMsgBuilder.WriteString("成功刷新了 ")
+		successMsgBuilder.WriteString(strconv.Itoa(actualReduced))
+		successMsgBuilder.WriteString(" 次钓鱼次数，花费了 ")
+		successMsgBuilder.WriteString(strconv.Itoa(cost))
+		successMsgBuilder.WriteString(wallet.GetWalletName())
+		successMsgBuilder.WriteString("。")
+
+		// 判断是否买多了
+		// 条件：用户想刷新的次数 > 实际刷新的次数，并且刷新前的确有已钓次数，并且刷新后次数归0
+		if refreshAmount > actualReduced && originalFishState.Fish > 0 && newFishCount == 0 {
+			successMsgBuilder.WriteString(" 你买多了！下次长点记性哦。")
+		}
+		
+		successMsgBuilder.WriteString(" 当前已钓次数为: ")
+		successMsgBuilder.WriteString(strconv.Itoa(newFishCount))
+		successMsgBuilder.WriteString("。")
+
+
+		ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(successMsgBuilder.String()))
+	})
 	engine.OnRegex(`^进行(([1-5]\d|[1-9])次)?钓鱼$`, getdb).SetBlock(true).Limit(ctxext.LimitByUser).Handle(func(ctx *zero.Ctx) {
 		uid := ctx.Event.UserID
 		numberOfPole, err := dbdata.getNumberFor(uid, "竿")
