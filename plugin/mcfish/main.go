@@ -256,6 +256,43 @@ func (sql *fishdb) updateFishInfo(uid int64, number int) (residue int, err error
 	return
 }
 
+// 更新用户已钓鱼次数（减少）
+func (sql *fishdb) reduceFishCount(uid int64, countToReduce int) (actualReduced int, currentFishCount int, err error) {
+	sql.Lock()
+	defer sql.Unlock()
+	userInfo := fishState{ID: uid}
+	// 尝试创建表，如果已存在则无影响
+	err = sql.db.Create("fishState", &userInfo)
+	if err != nil {
+		// 如果创建表失败（通常不应该发生，除非是DB权限等问题），直接返回错误
+		return 0, 0, err
+	}
+	// 查询用户信息
+	_ = sql.db.Find("fishState", &userInfo, "WHERE ID = ?", uid)
+
+	// 检查是否是新的一天，如果是，则重置当天的钓鱼次数
+	if time.Unix(userInfo.Duration, 0).Day() != time.Now().Day() {
+		userInfo.Fish = 0 // 当天实际已钓次数为0
+		userInfo.Duration = time.Now().Unix()
+		// 注意：这里不直接插入，依赖后续的逻辑统一插入
+	}
+
+	if userInfo.Fish == 0 {
+		return 0, 0, nil // 用户当天没有钓鱼记录或已钓次数为0，无需刷新
+	}
+
+	if countToReduce >= userInfo.Fish {
+		actualReduced = userInfo.Fish
+		userInfo.Fish = 0
+	} else {
+		actualReduced = countToReduce
+		userInfo.Fish -= countToReduce
+	}
+	currentFishCount = userInfo.Fish
+	err = sql.db.Insert("fishState", &userInfo) // 更新数据库中的钓鱼次数
+	return
+}
+
 // 更新诅咒
 func (sql *fishdb) updateCurseFor(uid int64, info string, number int) (err error) {
 	if number < 1 {
