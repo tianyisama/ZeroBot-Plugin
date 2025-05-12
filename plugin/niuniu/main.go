@@ -4,6 +4,7 @@ package niuniu
 import (
 	"fmt"
 	"math/rand"
+	"regexp" // <--- 添加这行
 	"strconv"
 	"time"
 
@@ -374,8 +375,21 @@ func init() {
 	
 		// 正常的JJ逻辑 (如果目标不是2675712883)
 		var itemName string
-		if len(patternParsed[0].Matched) > 1 { // 提取道具名称
-			itemName = patternParsed[0].Matched[1]
+		textMatchedByTextRule := patternParsed[0].Text() // 获取匹配了 Text() 规则的完整字符串，例如 "使用道具名jj" 或 "jj"
+		
+		// 使用正则表达式从上述字符串中提取道具名
+		// 正则表达式 `^(?:.*使用(.*))??jj$` 中的 (.*) 就是我们要的道具名
+		// 注意末尾的 `$`确保匹配到字符串结束，防止部分匹配问题。
+		// MustCompile 会在编译时检查正则表达式，如果无效则 panic，通常用于固定的正则表达式。
+		itemExtractRegex := regexp.MustCompile(`^(?:.*使用(.*))??jj$`)
+		matches := itemExtractRegex.FindStringSubmatch(textMatchedByTextRule)
+		
+		// FindStringSubmatch 返回一个切片：
+		// matches[0] 是整个正则表达式匹配的字符串
+		// matches[1] 是第一个捕获组的内容 (即道具名称)
+		// 如果没有 "使用<道具>" 部分，则 (.*) 可能不匹配或为空，len(matches) 可能只有1，或者 matches[1] 为空字符串
+		if len(matches) > 1 && matches[1] != "" {
+		    itemName = matches[1]
 		}
 	
 		msg, length, err := niu.JJ(gid, uid, adduser, itemName)
