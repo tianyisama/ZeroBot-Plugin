@@ -81,7 +81,12 @@ func init() {
 				ctx.Send(message.ReplyWithMessage(ctx.Event.MessageID, message.At(uid), message.Text("不能打劫自己")))
 				return
 			}
-
+			// 检查打劫者自身的钱包余额
+			robberWallet := wallet.GetWalletOf(uid)
+			if robberWallet < 100 {
+				ctx.Send(message.ReplyWithMessage(ctx.Event.MessageID, message.At(uid), message.Text("你的"+wallet.GetWalletName()+"不足100，不可以打劫别人！")))
+				return
+			}
 			// 查询记录
 			ok, err := police.getRecord(victimID, uid)
 			if err != nil {
