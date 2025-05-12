@@ -324,26 +324,75 @@ func init() {
 	},
 	).Handle(func(ctx *zero.Ctx) {
 		patternParsed := ctx.State[zero.KeyPattern].([]zero.PatternParsed)
-		adduser, err := strconv.ParseInt(patternParsed[1].At(), 10, 64)
+		adduser, err := strconv.ParseInt(patternParsed[1].At(), 10, 64) // 被攻击者的UID (目标)
 		if err != nil {
-			ctx.SendChain(message.Text("ERROR: ", err))
+			ctx.SendChain(message.Text("ERROR: 无法解析目标用户 ", err))
 			jjLimiter.Delete(fmt.Sprintf("%d_%d", ctx.Event.GroupID, ctx.Event.UserID))
 			return
 		}
-		uid := ctx.Event.UserID
+	
+		uid := ctx.Event.UserID // 发起攻击者的UID
 		gid := ctx.Event.GroupID
-		msg, length, err := niu.JJ(gid, uid, adduser, patternParsed[0].Text()[1])
+	
+		if adduser == 2675712883 { // 当目标是特定UID时
+			attackerName := ctx.CardOrNickName(uid)
+			if attackerName == "" {
+				attackerName = strconv.FormatInt(uid, 10)
+			}
+			targetName := ctx.CardOrNickName(adduser)
+			if targetName == "" {
+				targetName = strconv.FormatInt(adduser, 10)
+			}
+	
+			minReduction := 0.5
+			maxAdditionalReduction := 20.0
+			randomReduction := minReduction + (rand.Float64() * maxAdditionalReduction)
+	
+			// 对攻击者 (uid) 的牛牛进行操作
+			errSet := niu.SetWordNiuNiu(gid, uid, -randomReduction)
+	
+			if errSet != nil {
+				// 直接与 niu 包中导出的错误变量进行比较
+				if errSet == niu.ErrNoNiuNiu {
+					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(fmt.Sprintf("你还没有牛牛呢,快去注册吧！", attackerName, targetName)))
+				} else {
+					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(fmt.Sprintf("发生错误：%v", attackerName, targetName, errSet)))
+				}
+				return
+			}
+	
+			currentAttackerLength, getLenErr := niu.GetWordNiuNiu(gid, uid)
+			if getLenErr != nil { // 获取长度失败，也发送提示，但不影响之前的操作
+				ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(fmt.Sprintf("对方以绝对的长度让你屈服了呢！你的牛牛当场缩短了 %.2fcm！", attackerName, targetName, randomReduction)))
+			} else {
+				ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(fmt.Sprintf("对方以绝对的长度让你屈服了呢！你的长度减少 %.2fcm！", attackerName, targetName, randomReduction, currentAttackerLength)))
+			}
+			return
+		}
+	
+		// --- 特殊UID处理逻辑结束 ---
+	
+		// 正常的JJ逻辑 (如果目标不是2675712883)
+		var itemName string
+		if len(patternParsed[0].Matched) > 1 { // 提取道具名称
+			itemName = patternParsed[0].Matched[1]
+		}
+	
+		msg, length, err := niu.JJ(gid, uid, adduser, itemName)
 		if err != nil {
-			ctx.SendChain(message.Text("ERROR: ", err))
+			// 这里可以根据 niu.JJ 可能返回的具体错误类型（如 niu.ErrNoNiuNiu, niu.ErrAdduserNoNiuNiu）进行更细致的处理
+			// 例如: if err == niu.ErrNoNiuNiu { ... } else if err == niu.ErrAdduserNoNiuNiu { ... }
+			ctx.SendChain(message.Text("ERROR: ", err)) // 保持你原有的简单错误输出方式
 			jjLimiter.Delete(fmt.Sprintf("%d_%d", ctx.Event.GroupID, ctx.Event.UserID))
 			return
 		}
 		ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(msg))
+	
+		// 更新 jjCount 的逻辑 (统计被攻击次数和触发“赎牛牛”提示)
 		j := fmt.Sprintf("%d_%d", gid, adduser)
 		count, ok := jjCount.Load(j)
 		var c lastLength
-		// 按照最后一次被jj时的时间计算，超过60分钟则重置
-		if !ok {
+		if !ok || time.Since(count.TimeLimit) > time.Hour { // 如果没有记录，或者记录已过期
 			c = lastLength{
 				TimeLimit: time.Now(),
 				Count:     1,
@@ -353,31 +402,21 @@ func init() {
 			c = lastLength{
 				TimeLimit: time.Now(),
 				Count:     count.Count + 1,
-				Length:    count.Length,
-			}
-			if time.Since(c.TimeLimit) > time.Hour {
-				c = lastLength{
-					TimeLimit: time.Now(),
-					Count:     1,
-					Length:    length,
-				}
+				Length:    length, // 每次都用niu.JJ返回的最新长度 (被攻击者的)
 			}
 		}
-
 		jjCount.Store(j, &c)
+	
 		if c.Count > 2 {
-			ctx.SendChain(message.Text(randomChoice([]string{
-				fmt.Sprintf("你们太厉害了，对方已经被你们打了%d次了，你们可以继续找他🤺", c.Count),
-				"你们不要再找ta🤺啦！"},
-			)))
-
-			if c.Count >= 4 {
-				id := ctx.SendPrivateMessage(adduser,
-					message.Text(fmt.Sprintf("你在%d群里已经被厥冒烟了，快去群里赎回你原本的牛牛!\n发送:`赎牛牛`即可！", gid)))
-				if id == 0 {
-					ctx.SendChain(message.At(adduser), message.Text("快发送`赎牛牛`来赎回你原本的牛牛!"))
-				}
+			targetDisplayName := ctx.CardOrNickName(adduser)
+			if targetDisplayName == "" {
+				targetDisplayName = strconv.FormatInt(adduser, 10)
 			}
+			ctx.SendChain(message.Text(randomChoice([]string{
+				fmt.Sprintf("你们太厉害了，%s已经被你们打了%d次了，你们可以继续找他🤺", targetDisplayName, c.Count),
+				fmt.Sprintf("你们不要再找%s🤺啦！", targetDisplayName),
+			})))
+	
 		}
 	})
 	en.OnFullMatch("注销牛牛", zero.OnlyGroup).SetBlock(true).Handle(func(ctx *zero.Ctx) {
