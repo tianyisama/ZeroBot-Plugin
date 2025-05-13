@@ -354,18 +354,18 @@ func init() {
 			if errSet != nil {
 				// 直接与 niu 包中导出的错误变量进行比较
 				if errSet == niu.ErrNoNiuNiu {
-					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(fmt.Sprintf("你还没有牛牛呢,快去注册吧！", attackerName, targetName)))
+					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(fmt.Sprintf("你还没有牛牛呢,快去注册吧！")))
 				} else {
-					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(fmt.Sprintf("发生错误：%v", attackerName, targetName, errSet)))
+					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(fmt.Sprintf("发生错误：%v", errSet)))
 				}
 				return
 			}
 	
 			currentAttackerLength, getLenErr := niu.GetWordNiuNiu(gid, uid)
 			if getLenErr != nil { // 获取长度失败，也发送提示，但不影响之前的操作
-				ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(fmt.Sprintf("对方以绝对的长度让你屈服了呢！你的牛牛当场缩短了 %.2fcm！", attackerName, targetName, randomReduction)))
+				ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(fmt.Sprintf("对方以绝对的长度让你屈服了呢！你的牛牛当场缩短了 %.2fcm！", randomReduction)))
 			} else {
-				ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(fmt.Sprintf("对方以绝对的长度让你屈服了呢！你的长度减少 %.2fcm！", attackerName, targetName, randomReduction, currentAttackerLength)))
+				ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(fmt.Sprintf("对方以绝对的长度让你屈服了呢！你的长度减少 %.2fcm！", randomReduction)))
 			}
 			return
 		}
@@ -417,7 +417,7 @@ func init() {
 				targetDisplayName = strconv.FormatInt(adduser, 10)
 			}
 			ctx.SendChain(message.Text(randomChoice([]string{
-				fmt.Sprintf("你们太厉害了，%s已经被你们打了%d次了，你们可以继续找他🤺", targetDisplayName, c.Count),
+				fmt.Sprintf("你们太厉害了，对方已经被你们打了%d次了，你们可以继续找他🤺", c.Count),
 				fmt.Sprintf("你们不要再找%s🤺啦！", targetDisplayName),
 			})))
 	
