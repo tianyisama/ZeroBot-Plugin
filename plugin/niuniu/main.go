@@ -361,12 +361,7 @@ func init() {
 				return
 			}
 	
-			currentAttackerLength, getLenErr := niu.GetWordNiuNiu(gid, uid)
-			if getLenErr != nil { // 获取长度失败，也发送提示，但不影响之前的操作
-				ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(fmt.Sprintf("对方以绝对的长度让你屈服了呢！你的牛牛当场缩短了 %.2fcm！", randomReduction)))
-			} else {
-				ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(fmt.Sprintf("对方以绝对的长度让你屈服了呢！你的长度减少 %.2fcm！", randomReduction)))
-			}
+			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(fmt.Sprintf("对方以绝对的长度让你屈服了呢！你的牛牛当场缩短了 %.2fcm！", randomReduction)))
 			return
 		}
 	
